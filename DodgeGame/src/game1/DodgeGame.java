@@ -1,6 +1,8 @@
 package game1;
 
 import static game1.Thing.*;
+import static game1.Dodger.*;
+
 import net.slashie.libjcsi.*;
 import net.slashie.libjcsi.examples.*;
 import net.slashie.libjcsi.examples.luck.*;
@@ -16,12 +18,15 @@ import java.math.*;
 
 class Thing {
 
-    static int MAX_HEIGHT = 24;
-    static int MAX_WIDTH = 79;
+    static int MAX_Y = 22;
+    static int MIN_Y = 3;
+    static int MAX_X = 55;
+    static int MIN_X = 26;
     int height;
     int deltaH;
     int width;
     int deltaW;
+    static int counter = 0;
 
     public static int randInt(int min, int max) {
         Random rand = new Random();
@@ -29,56 +34,94 @@ class Thing {
         return randomNum;
     }
 
-    Thing(int y, int x, int deltaY, int deltaX) {
+    Thing(int x, int y, int deltaY, int deltaX) {
         this.height = y;
         this.width = x;
         this.deltaH = deltaY;
         this.deltaW = deltaX;
     }
 
-    public Thing tick() {
+    public Thing tickThing() {
         int newY = height + deltaH;
         int newX = width + deltaW;
-        if (newY == MAX_HEIGHT) {
-            return new Thing(0, randInt(1, MAX_WIDTH-1), 1, 0);
-        } else if (newX == MAX_WIDTH) {
-            return new Thing(randInt(1, MAX_HEIGHT-1), 0, 0, 1);
+        if (newY == MAX_Y && deltaW == 0) {
+            counter++;
+            return new Thing(randInt(MIN_X, MAX_X - 1), MIN_Y, 1, 0);
+        } else if (newX == MAX_X && deltaH == 0) {
+            counter++;
+            return new Thing(MIN_X, randInt(MIN_Y, MAX_Y - 1), 0, 1);
         } else {
-            return new Thing(newY, newX, deltaH, deltaW);
+            return new Thing(newX, newY, deltaH, deltaW);
         }
     }
 
-    public void draw(ConsoleSystemInterface s) {
+    public void drawThing(ConsoleSystemInterface s) {
         String disp;
-        switch (deltaH) {
-            case 0:
-                disp = ">";
-                break;
-            default:
-                disp = "v";
-                break;
+        if (deltaH == 0) {
+            disp = ">";
+        } else {
+            disp = "V";
         }
         s.print(width, height, disp, s.WHITE);
     }
+}
 
+class Dodger {
+    int x;
+    int y;
+
+    Dodger(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public void drawDodger(ConsoleSystemInterface s) {
+        s.print(x, y, "O", s.WHITE);
+    }
+
+    public Dodger moveDodger(CharKey key) {
+        if (key.isRightArrow()) {
+            return new Dodger(this.x + 1, this.y);
+        }
+        if (key.isLeftArrow()) {
+            return new Dodger(this.x - 1, this.y);
+        }
+        if (key.isUpArrow()) {
+            return new Dodger(this.x, this.y - 1);
+        }
+        if (key.isDownArrow()) {
+            return new Dodger(this.x, this.y - 1);
+        } else {
+            return new Dodger(this.x, this.y);
+        }
+    }
 }
 
 public class DodgeGame {
 
-    // IDEA: 5x5 (7x7?) grid.
-    //       'Rocks' randomly spawn around edge and move through middle.
-    //          - Top to bottom + left to right.
-    //        Player starts in middle of grid, trys to avoid being hit.
-    //        Score is number of rocks that have cleared the screen.
-    //        No win condition, only fail: got hit by a rock.
-    //        MAYBE ADD: 
-    //         If 2 rocks collide they fill the square, blocking it from player use.
+    public static void drawBoundary(ConsoleSystemInterface s) {
+        String disp = "X";
+        for (int x = 25; x < 56; x++) {
+            for (int y = 2; y < 23; y++) {
+                if (x == 25 && (y >= 2 || y <= 22)) {
+                    s.print(x, y, disp, s.WHITE);
+                } else if (x == 55 && (y >= 2 || y <= 22)) {
+                    s.print(x, y, disp, s.WHITE);
+                } else if (y == 2 && (x >= 25 || x <= 55)) {
+                    s.print(x, y, disp, s.WHITE);
+                } else if (y == 22 && (x >= 25 || x <= 55)) {
+                    s.print(x, y, disp, s.WHITE);
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) {
         ConsoleSystemInterface csi = new WSwingConsoleInterface("Dodge the Thing!", true);
 
         csi.cls();
         csi.print(1, 1, "Welcome to DODGE THE THING!", ConsoleSystemInterface.GREEN);
-        csi.print(2, 3, "An exciting game where you (X) dodge things (v or >)!");
+        csi.print(2, 3, "An exciting game where you (O) dodge things (v & >)!");
         csi.print(2, 4, "To begin, what is your name?", ConsoleSystemInterface.BLUE);
         csi.print(2, 5, "(Press ENTER after input)");
 
@@ -86,35 +129,23 @@ public class DodgeGame {
         csi.print(2, 6, "Hi " + name + ", press SPACE to begin!");
         csi.refresh();
         csi.waitKey(CharKey.SPACE);
-        
-        Thing tDOWN1 = new Thing(0, randInt(1, MAX_WIDTH-1), 1, 0);
-        Thing tDOWN2 = new Thing(0, randInt(1, MAX_WIDTH-1), 1, 0);
-        Thing tDOWN3 = new Thing(0, randInt(1, MAX_WIDTH-1), 1, 0);
-        Thing tLEFT1 = new Thing(randInt(1, MAX_HEIGHT-1), 0, 0, 1);
-        Thing tLEFT2 = new Thing(randInt(1, MAX_HEIGHT-1), 0, 0, 1);
-        Thing tLEFT3 = new Thing(randInt(1, MAX_HEIGHT-1), 0, 0, 1);
-        
+
+        Thing tDOWN = new Thing(randInt(MIN_X, MAX_X - 1), MIN_Y, 1, 0);
+        Thing tLEFT = new Thing(MIN_X, randInt(MIN_Y, MAX_Y - 1), 0, 1);
+
         while (true) {
             csi.cls();
-            tDOWN1.draw(csi);
-            tLEFT1.draw(csi);
-            tDOWN2.draw(csi);
-            tLEFT2.draw(csi);
-            tDOWN3.draw(csi);
-            tLEFT3.draw(csi);
+            csi.print(1, 1, name + "'s SCORE:" + counter, ConsoleSystemInterface.WHITE);
+            drawBoundary(csi);
+            tDOWN.drawThing(csi);
+            tLEFT.drawThing(csi);
             csi.refresh();
             try {
-                TimeUnit.MILLISECONDS.sleep(16 * 4);
-            } catch (InterruptedException IE){
-                
+                TimeUnit.MILLISECONDS.sleep(128);
+            } catch (InterruptedException IE) {
             }
-            tDOWN1 = tDOWN1.tick();
-            tDOWN2 = tDOWN2.tick();
-            tDOWN3 = tDOWN3.tick();
-            tLEFT1 = tLEFT1.tick();
-            tLEFT2 = tLEFT2.tick();
-            tLEFT3 = tLEFT3.tick();
+            tDOWN = tDOWN.tickThing();
+            tLEFT = tLEFT.tickThing();
         }
     }
-
 }
