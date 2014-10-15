@@ -301,6 +301,10 @@ class Testing implements Constants {
     Dodger d1Right = new Dodger(new Posn(340, 300), dRADIUS, dCOLOR);
     Dodger d1Up = new Dodger(new Posn(300, 260), dRADIUS, dCOLOR);
     Dodger d1Down = new Dodger(new Posn(300, 340), dRADIUS, dCOLOR);
+    Dodger d1LeftUp = new Dodger(new Posn(260, 260), dRADIUS, dCOLOR);
+    Dodger d1UpRight = new Dodger(new Posn(340, 260), dRADIUS, dCOLOR);
+    Dodger d1RightDown = new Dodger(new Posn(340, 340), dRADIUS, dCOLOR);
+    Dodger d1DownLeft = new Dodger(new Posn(260, 340), dRADIUS, dCOLOR);
 
     Dodger d2 = new Dodger(new Posn(-20, 300), dRADIUS, dCOLOR);
     Dodger d3 = new Dodger(new Posn(620, 300), dRADIUS, dCOLOR);
@@ -381,6 +385,14 @@ class Testing implements Constants {
                 && t.checkExpect(this.d1Up.didCollide(e1),
                         true, "test didCollide - explosion1")
                 && t.checkExpect(this.d1Down.didCollide(e1),
+                        true, "test didCollide - explosion1")
+                && t.checkExpect(this.d1LeftUp.didCollide(e1),
+                        true, "test didCollide - explosion1")
+                && t.checkExpect(this.d1RightDown.didCollide(e1),
+                        true, "test didCollide - explosion1")
+                && t.checkExpect(this.d1UpRight.didCollide(e1),
+                        true, "test didCollide - explosion1")
+                && t.checkExpect(this.d1DownLeft.didCollide(e1),
                         true, "test didCollide - explosion1");
     }
 
