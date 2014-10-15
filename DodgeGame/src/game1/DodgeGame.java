@@ -66,6 +66,11 @@ class Dodger implements Constants {
                 || this.center.y < 0
                 || this.center.y > height;
     }
+    
+    boolean didCollide(Thing thing){
+        return this.center.x == thing.center.x
+                && this.center.y == thing.center.y;
+    }
 }
 // Class of Thing, which is randomly generated and automatically moved
 class Thing implements Constants {
@@ -148,9 +153,9 @@ class DodgeWorld extends World implements Constants {
             this.thing1 = new Thing(new Posn(-20, 20+randInt(0,14)*40), tRADIUS, 1, 0, tCOLOR);
             this.thing2 = new Thing(new Posn(20+randInt(0,14)*40, -20), tRADIUS, 0, 1, tCOLOR);
             return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing());
+        } if (this.dodger.didCollide(thing1) || this.dodger.didCollide(thing2)){
+            return this.endOfWorld("You didn't dodge the thing! :(/");
         }
-        //if (this.dodger.hitThing){
-          //  return this.endOfWorld("You didn't dodge the thing");
         //} if (this.thing.hitThing){
           //  return //new impassable object
         //}
@@ -185,6 +190,9 @@ class DodgeWorld extends World implements Constants {
         if (this.dodger.outOfBounds(this.width, this.height)){
             return new WorldEnd(true, new OverlayImages(this.makeImage(),
             new TextImage(new Posn(this.width/2, this.height/2), "Out of Bounds", sCOLOR)));
+        } if (this.dodger.didCollide(thing1) || this.dodger.didCollide(thing2)){
+            return new WorldEnd(true, new OverlayImages(this.makeImage(),
+            new TextImage(new Posn(this.width/2, this.height/2), "You didn't Dodge the Thing!", sCOLOR)));
         } else {
             return new WorldEnd(false, this.makeImage());
         }
@@ -200,6 +208,11 @@ public class DodgeGame implements Constants{
     }
     
     public static void main(String[] args) {
+        Dodger testDodge = new Dodger(new Posn(300,300), dRADIUS, dCOLOR);
+        Thing testThing = new Thing(new Posn(300,300), tRADIUS, 0, 0, tCOLOR);
+        
+        System.out.println(testDodge.didCollide(testThing) + " should be " + true);
+        
         DodgeWorld w1 = new DodgeWorld(new Dodger(new Posn(300, 300), dRADIUS, dCOLOR), 
                                        new Thing(new Posn(20, 20+randInt(0,14)*40), tRADIUS, 1, 0, tCOLOR),
                                        new Thing(new Posn(20+randInt(0,14)*40, 20), tRADIUS, 0, 1, tCOLOR));
