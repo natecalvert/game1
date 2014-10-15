@@ -406,7 +406,7 @@ class Testing implements Constants {
                         true, "test outOfBounds - Bottom " + "\n");
     }
 
-    // Test method atBounds in Dodger class
+    // Test method atBounds in Thing class
     boolean testAtBounds(Tester t) {
         return t.checkExpect(this.t3.atBounds(wWIDTH, wHEIGHT),
                 true, "test atBounds - Right " + "\n")
