@@ -1,151 +1,209 @@
 package game1;
 
-import static game1.Thing.*;
-import static game1.Dodger.*;
+import javalib.colors.*;
+import javalib.funworld.*;
+import javalib.worldcanvas.*;
+import javalib.worldimages.*;
 
-import net.slashie.libjcsi.*;
-import net.slashie.libjcsi.examples.*;
-import net.slashie.libjcsi.examples.luck.*;
-import net.slashie.libjcsi.examples.luck.toybox.*;
-import net.slashie.libjcsi.jcurses.*;
-import net.slashie.libjcsi.textcomponents.*;
-import net.slashie.libjcsi.wswing.*;
-import net.slashie.util.*;
+import java.awt.Color;
+import java.util.Random;
+import java.awt.*;
 
-import java.util.concurrent.TimeUnit;
-import java.util.*;
-import java.math.*;
+interface Constants {
+    int wWIDTH = 600;
+    int wHEIGHT = 600;
+    Color wCOLOR = Color.BLACK;
+    int dRADIUS = 20;
+    Color dCOLOR = Color.WHITE;
+    int tRADIUS = 20;
+    Color tCOLOR = Color.RED;
+    Color sCOLOR = Color.BLUE;
+}
 
-class Thing {
+// Class of Dodger, which is user controlled
+class Dodger implements Constants {
 
-    static int MAX_Y = 22;
-    static int MIN_Y = 3;
-    static int MAX_X = 55;
-    static int MIN_X = 26;
-    int height;
-    int deltaH;
-    int width;
-    int deltaW;
-    static int counter = 0;
+    Posn center;
+    int radius;
+    Color color;
 
+    // Constructor for Dodger
+    Dodger(Posn center, int radius, Color color) {
+        this.center = center;
+        this.radius = radius;
+        this.color = color;
+    }
+
+    // Produce the image of the Dodger at it's curent location
+    WorldImage dodgerImage() {
+        return new DiskImage(this.center, this.radius, this.color);
+    }
+
+    // Moves the Dodger based on user inputs
+    public Dodger moveDodger (String key) {
+        switch (key) {
+            case "right":
+                return new Dodger(new Posn(this.center.x + dRADIUS*2, this.center.y),
+                        this.radius, this.color);
+            case "left":
+                return new Dodger(new Posn(this.center.x - dRADIUS*2, this.center.y),
+                        this.radius, this.color);
+            case "up":
+                return new Dodger(new Posn(this.center.x, this.center.y - dRADIUS*2),
+                        this.radius, this.color);
+            case "down":
+                return new Dodger(new Posn(this.center.x, this.center.y + dRADIUS*2),
+                        this.radius, this.color);
+            default:
+                return this;
+        }
+    }
+
+    // Checks if Dodger is out of bounds.
+    boolean outOfBounds(int width, int height) {
+        return this.center.x < 0
+                || this.center.x > width
+                || this.center.y < 0
+                || this.center.y > height;
+    }
+}
+// Class of Thing, which is randomly generated and automatically moved
+class Thing implements Constants {
+    
+    Posn center;
+    int radius;
+    int dX;
+    int dY;
+    Color color;
+    
+    // Constructor for Thing
+    Thing(Posn center, int radius, int dX, int dY, Color color) {
+        this.center = center;
+        this.radius = radius;
+        this.dX = dX;
+        this.dY = dY;
+        this.color = color;
+    }
+
+    // Produce the image of the Thing at it's curent location
+    WorldImage thingImage() {
+        return new DiskImage(this.center, this.radius, this.color);
+    }
+
+    // Moves the Thing
+    public Thing moveThing () {
+        if (this.dX == 0){
+            return new Thing(new Posn(this.center.x, this.center.y + tRADIUS*2), this.radius, this.dX, this.dY, this.color);
+        } else if (this.dY == 0){
+            return new Thing(new Posn(this.center.x + tRADIUS*2, this.center.y), this.radius, this.dX, this.dY, this.color);
+        } else { //This should NEVER HAPPEN.
+            return new Thing(new Posn(300, 300), 300, 1, 1, Color.ORANGE);
+        }
+    }
+
+    // Checks if Thing is at bounds.
+    boolean atBounds(int width, int height) {
+        return this.center.x > width || this.center.y > height;
+    }
+}
+
+// Class for world of the 'Thing's
+class DodgeWorld extends World implements Constants {
+
+    int width = wWIDTH;
+    int height = wHEIGHT;
+    Dodger dodger;
+    Thing thing1;
+    Thing thing2;
+    
+    // Generates random integers used in placing Thing
     public static int randInt(int min, int max) {
         Random rand = new Random();
         int randomNum = rand.nextInt((max - min) + 1) + min;
         return randomNum;
     }
 
-    Thing(int x, int y, int deltaY, int deltaX) {
-        this.height = y;
-        this.width = x;
-        this.deltaH = deltaY;
-        this.deltaW = deltaX;
+    // Constructor for the world
+    public DodgeWorld(Dodger dodger, Thing thing1, Thing thing2) {
+        super();
+        this.dodger = dodger;
+        this.thing1 = thing1;
+        this.thing2 = thing2;
+    }
+    
+    //Move Dodger on key presses
+    public World onKeyEvent(String key){
+        return new DodgeWorld(this.dodger.moveDodger(key), this.thing1, this.thing2);
     }
 
-    public Thing tickThing() {
-        int newY = height + deltaH;
-        int newX = width + deltaW;
-        if (newY == MAX_Y && deltaW == 0) {
-            counter++;
-            return new Thing(randInt(MIN_X, MAX_X - 1), MIN_Y, 1, 0);
-        } else if (newX == MAX_X && deltaH == 0) {
-            counter++;
-            return new Thing(MIN_X, randInt(MIN_Y, MAX_Y - 1), 0, 1);
-        } else {
-            return new Thing(newX, newY, deltaH, deltaW);
+    // On tick check:
+    // - If Dodger is in bounds.
+    // - If Dodger hit a Thing.
+    // - If the Thing's hit eachother.
+    public World onTick(){
+        // If Dodger is at bounds, don't allow movement in past bounds.
+        if (this.dodger.outOfBounds(this.width, this.height)){
+            return this.endOfWorld("Out of Bounds");
+        } if (this.thing1.atBounds(this.width, this.height)){
+            this.thing1 = new Thing(new Posn(-20, 20+randInt(0,14)*40), tRADIUS, 1, 0, tCOLOR);
+            this.thing2 = new Thing(new Posn(20+randInt(0,14)*40, -20), tRADIUS, 0, 1, tCOLOR);
+            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing());
+        }
+        //if (this.dodger.hitThing){
+          //  return this.endOfWorld("You didn't dodge the thing");
+        //} if (this.thing.hitThing){
+          //  return //new impassable object
+        //}
+        else {
+            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing());
         }
     }
-
-    public void drawThing(ConsoleSystemInterface s) {
-        String disp;
-        if (deltaH == 0) {
-            disp = ">";
+    
+    // Background image for world 
+    public WorldImage background = 
+            new RectangleImage(new Posn(this.width/2, this.height/2), this.width, this.height, wCOLOR);
+    
+    // Produce image of world by adding Dodger and Thing to the background
+    public WorldImage makeImage(){
+        return new OverlayImages(this.background, 
+                new OverlayImages(this.dodger.dodgerImage(), 
+                        new OverlayImages(this.thing1.thingImage(),
+                        this.thing2.thingImage())));
+    }
+    
+    // Produce image of world by adding fail state explanation to background
+    public WorldImage lastImage(String s){
+        return new OverlayImages(this.makeImage(), 
+                new TextImage(new Posn(this.width/2, this.height/2), s, sCOLOR));
+    }
+    
+    //Check:
+    // - If Dodger is in bounds.
+    // - If Dodger hit a Thing.
+    // - If the Thing's hit eachother.
+    public WorldEnd worldEnds(){
+        if (this.dodger.outOfBounds(this.width, this.height)){
+            return new WorldEnd(true, new OverlayImages(this.makeImage(),
+            new TextImage(new Posn(this.width/2, this.height/2), "Out of Bounds", sCOLOR)));
         } else {
-            disp = "V";
+            return new WorldEnd(false, this.makeImage());
         }
-        s.print(width, height, disp, s.WHITE);
     }
 }
 
-class Dodger {
-    int x;
-    int y;
-
-    Dodger(int x, int y) {
-        this.x = x;
-        this.y = y;
+public class DodgeGame implements Constants{
+    
+    public static int randInt(int min, int max) {
+        Random rand = new Random();
+        int randomNum = rand.nextInt((max - min) + 1) + min;
+        return randomNum;
     }
-
-    public void drawDodger(ConsoleSystemInterface s) {
-        s.print(x, y, "O", s.WHITE);
-    }
-
-    public Dodger moveDodger(CharKey key) {
-        if (key.isRightArrow()) {
-            return new Dodger(this.x + 1, this.y);
-        }
-        if (key.isLeftArrow()) {
-            return new Dodger(this.x - 1, this.y);
-        }
-        if (key.isUpArrow()) {
-            return new Dodger(this.x, this.y - 1);
-        }
-        if (key.isDownArrow()) {
-            return new Dodger(this.x, this.y - 1);
-        } else {
-            return new Dodger(this.x, this.y);
-        }
-    }
-}
-
-public class DodgeGame {
-
-    public static void drawBoundary(ConsoleSystemInterface s) {
-        String disp = "X";
-        for (int x = 25; x < 56; x++) {
-            for (int y = 2; y < 23; y++) {
-                if (x == 25 && (y >= 2 || y <= 22)) {
-                    s.print(x, y, disp, s.WHITE);
-                } else if (x == 55 && (y >= 2 || y <= 22)) {
-                    s.print(x, y, disp, s.WHITE);
-                } else if (y == 2 && (x >= 25 || x <= 55)) {
-                    s.print(x, y, disp, s.WHITE);
-                } else if (y == 22 && (x >= 25 || x <= 55)) {
-                    s.print(x, y, disp, s.WHITE);
-                }
-            }
-        }
-    }
-
+    
     public static void main(String[] args) {
-        ConsoleSystemInterface csi = new WSwingConsoleInterface("Dodge the Thing!", true);
+        DodgeWorld w1 = new DodgeWorld(new Dodger(new Posn(300, 300), dRADIUS, dCOLOR), 
+                                       new Thing(new Posn(20, 20+randInt(0,14)*40), tRADIUS, 1, 0, tCOLOR),
+                                       new Thing(new Posn(20+randInt(0,14)*40, 20), tRADIUS, 0, 1, tCOLOR));
+        w1.bigBang(wWIDTH, wHEIGHT, 0.1);
 
-        csi.cls();
-        csi.print(1, 1, "Welcome to DODGE THE THING!", ConsoleSystemInterface.GREEN);
-        csi.print(2, 3, "An exciting game where you (O) dodge things (v & >)!");
-        csi.print(2, 4, "To begin, what is your name?", ConsoleSystemInterface.BLUE);
-        csi.print(2, 5, "(Press ENTER after input)");
-
-        String name = csi.input();
-        csi.print(2, 6, "Hi " + name + ", press SPACE to begin!");
-        csi.refresh();
-        csi.waitKey(CharKey.SPACE);
-
-        Thing tDOWN = new Thing(randInt(MIN_X, MAX_X - 1), MIN_Y, 1, 0);
-        Thing tLEFT = new Thing(MIN_X, randInt(MIN_Y, MAX_Y - 1), 0, 1);
-
-        while (true) {
-            csi.cls();
-            csi.print(1, 1, name + "'s SCORE:" + counter, ConsoleSystemInterface.WHITE);
-            drawBoundary(csi);
-            tDOWN.drawThing(csi);
-            tLEFT.drawThing(csi);
-            csi.refresh();
-            try {
-                TimeUnit.MILLISECONDS.sleep(128);
-            } catch (InterruptedException IE) {
-            }
-            tDOWN = tDOWN.tickThing();
-            tLEFT = tLEFT.tickThing();
-        }
     }
 }
