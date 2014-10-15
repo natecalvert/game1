@@ -20,6 +20,8 @@ interface Constants {
     Color dCOLOR = Color.WHITE;
     int tRADIUS = dRADIUS;
     Color tCOLOR = Color.RED;
+    int eRADIUS = dRADIUS * 3;
+    Color eCOLOR = Color.ORANGE;
     Color sCOLOR = Color.BLUE;
 }
 
@@ -74,6 +76,18 @@ class Dodger implements Constants {
         return this.center.x == thing.center.x
                 && this.center.y == thing.center.y;
     }
+
+    boolean didCollide(Explosion explosion) {
+        return this.center.x == explosion.center.x && this.center.y == explosion.center.y
+                || this.center.x == explosion.center.x + eRADIUS*2 / 3 && this.center.y == explosion.center.y + eRADIUS*2 / 3
+                || this.center.x == explosion.center.x + eRADIUS*2 / 3 && this.center.y == explosion.center.y
+                || this.center.x == explosion.center.x + eRADIUS*2 / 3 && this.center.y == explosion.center.y - eRADIUS*2 / 3
+                || this.center.x == explosion.center.x && this.center.y == explosion.center.y - eRADIUS*2 / 3
+                || this.center.x == explosion.center.x - eRADIUS*2 / 3 && this.center.y == explosion.center.y - eRADIUS*2 / 3
+                || this.center.x == explosion.center.x - eRADIUS*2 / 3 && this.center.y == explosion.center.y
+                || this.center.x == explosion.center.x - eRADIUS*2 / 3 && this.center.y == explosion.center.y + eRADIUS*2 / 3
+                || this.center.x == explosion.center.x && this.center.y == explosion.center.y + eRADIUS*2 / 3;
+    }
 }
 // Class of Thing, which is randomly generated and automatically moved
 
@@ -115,10 +129,27 @@ class Thing implements Constants {
         return this.center.x > width || this.center.y > height;
     }
 
-//    boolean hitThing(Thing thing) {
-//        return this.center.x == thing.center.x
-//                && this.center.y == thing.center.y;
-//    }
+    boolean hitThing(Thing thing) {
+        return this.center.x == thing.center.x
+                && this.center.y == thing.center.y;
+    }
+}
+
+class Explosion implements Constants {
+
+    Posn center;
+    int radius;
+    Color color;
+
+    Explosion(Posn center, int radius, Color color) {
+        this.center = center;
+        this.radius = radius;
+        this.color = color;
+    }
+
+    WorldImage explosionImage() {
+        return new RectangleImage(this.center, this.radius*2, this.radius*2, this.color);
+    }
 }
 
 // Class for world of the 'Thing's
@@ -129,6 +160,7 @@ class DodgeWorld extends World implements Constants {
     Dodger dodger;
     Thing thing1;
     Thing thing2;
+    Explosion explosion;
     int score;
 
     // Generates random integers used in placing Things
@@ -139,23 +171,26 @@ class DodgeWorld extends World implements Constants {
     }
 
     // Constructor for the world
-    public DodgeWorld(Dodger dodger, Thing thing1, Thing thing2, int score) {
+    public DodgeWorld(Dodger dodger, Thing thing1, Thing thing2, Explosion explosion, int score) {
         super();
         this.dodger = dodger;
         this.thing1 = thing1;
         this.thing2 = thing2;
+        this.explosion = explosion;
         this.score = score;
     }
 
     //Move Dodger on key presses
     public World onKeyEvent(String key) {
-        return new DodgeWorld(this.dodger.moveDodger(key), this.thing1, this.thing2, this.score);
+        return new DodgeWorld(this.dodger.moveDodger(key), this.thing1, this.thing2, this.explosion, this.score);
     }
 
     // On tick check:
     // - If Dodger is out of bounds.
     // - If Dodger hit a Thing.
     // - If Thing is ouf of bounds.
+    // - If thing1 hit thing2.
+    // - If Dodger hit an Explosion.
     public World onTick() {
         // If Dodger is out of bounds, end the world.
         if (this.dodger.outOfBounds(this.width, this.height)) {
@@ -167,17 +202,22 @@ class DodgeWorld extends World implements Constants {
         if (this.thing1.atBounds(this.width, this.height)) {
             this.thing1 = new Thing(new Posn(-20, 20 + randInt(0, 14) * 40), tRADIUS, 1, 0, tCOLOR);
             this.thing2 = new Thing(new Posn(20 + randInt(0, 14) * 40, -20), tRADIUS, 0, 1, tCOLOR);
-            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing(), this.score = this.score + 1);
+            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing(), this.explosion, this.score = this.score + 1);
         }
         // If Dodger hit either thing1 or thing2, end the world.
         if (this.dodger.didCollide(thing1) || this.dodger.didCollide(thing2)) {
             return this.endOfWorld("DodgerThingCollision");
-        } //        if (this.thing1.hitThing(thing2) || this.thing2.hitThing(thing1)) {
-        //            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing(), this.score);
-        //        } 
-        // Otherwise move thing1 and thing2.
+        }
+        // If thing1 and thing2 collide, create and Explosion.
+        if (this.thing1.hitThing(thing2) || this.thing2.hitThing(thing1)) {
+            this.explosion = new Explosion(new Posn(this.thing1.center.x, this.thing1.center.y), eRADIUS, eCOLOR);
+            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing(), this.explosion, this.score);
+        }// If Dodger hit an explosion, end the world.
+        if (this.dodger.didCollide(explosion)) {
+            return this.endOfWorld("DodgerBlewUp");
+        } // Otherwise move thing1 and thing2.
         else {
-            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing(), this.score);
+            return new DodgeWorld(this.dodger, this.thing1.moveThing(), this.thing2.moveThing(), this.explosion, this.score);
         }
     }
 
@@ -189,8 +229,9 @@ class DodgeWorld extends World implements Constants {
     public WorldImage makeImage() {
         return new OverlayImages(this.background,
                 new OverlayImages(this.dodger.dodgerImage(),
-                        new OverlayImages(this.thing1.thingImage(),
-                                this.thing2.thingImage())));
+                        new OverlayImages(this.explosion.explosionImage(),
+                                new OverlayImages(this.thing1.thingImage(),
+                                        this.thing2.thingImage()))));
     }
 
     // Produce image of world by adding fail state explanation to background
@@ -202,6 +243,7 @@ class DodgeWorld extends World implements Constants {
     //Check if World should end:
     // - When Dodger is out of bounds.
     // - If Dodger hit a Thing.
+    // - If Dodger hit and Explosion.
     public WorldEnd worldEnds() {
         if (this.dodger.outOfBounds(this.width, this.height)) {
             return new WorldEnd(true, new OverlayImages(this.makeImage(),
@@ -209,7 +251,10 @@ class DodgeWorld extends World implements Constants {
         }
         if (this.dodger.didCollide(thing1) || this.dodger.didCollide(thing2)) {
             return new WorldEnd(true, new OverlayImages(this.makeImage(),
-                    new TextImage(new Posn(this.width / 2, this.height / 2), "You didn't Dodge the Thing!" + " SCORE: " + this.score, sCOLOR)));
+                    new TextImage(new Posn(this.width / 2, this.height / 2), "You didn't 'Dodge the Thing'!" + " SCORE: " + this.score, sCOLOR)));
+        } if (this.dodger.didCollide(explosion)) {
+            return new WorldEnd(true, new OverlayImages(this.makeImage(),
+                    new TextImage(new Posn(this.width / 2, this.height / 2), "You blew up!" + " SCORE: " + this.score, sCOLOR)));
         } else {
             return new WorldEnd(false, this.makeImage());
         }
@@ -224,152 +269,148 @@ class Testing implements Constants {
     Dodger d1Right = new Dodger(new Posn(340, 300), dRADIUS, dCOLOR);
     Dodger d1Up = new Dodger(new Posn(300, 260), dRADIUS, dCOLOR);
     Dodger d1Down = new Dodger(new Posn(300, 340), dRADIUS, dCOLOR);
-    
+
     Dodger d2 = new Dodger(new Posn(-20, 300), dRADIUS, dCOLOR);
     Dodger d3 = new Dodger(new Posn(620, 300), dRADIUS, dCOLOR);
     Dodger d4 = new Dodger(new Posn(300, -20), dRADIUS, dCOLOR);
     Dodger d5 = new Dodger(new Posn(300, 620), dRADIUS, dCOLOR);
-    
+
     // examples of the Thing class
     Thing t1 = new Thing(new Posn(300, 300), tRADIUS, 1, 0, tCOLOR);
     Thing t1Right = new Thing(new Posn(340, 300), tRADIUS, 1, 0, tCOLOR);
     Thing t2 = new Thing(new Posn(300, 300), tRADIUS, 0, 1, tCOLOR);
     Thing t2Down = new Thing(new Posn(300, 340), tRADIUS, 0, 1, tCOLOR);
-    
+
     Thing t3 = new Thing(new Posn(620, 300), tRADIUS, 1, 0, tCOLOR);
     Thing t4 = new Thing(new Posn(300, 620), tRADIUS, 0, 1, tCOLOR);
     
+    // examples of the Explosion class
+    Explosion e1 = new Explosion(new Posn(300, 300), eRADIUS, eCOLOR);
+
     // examples of the DodgeWorld class
-    DodgeWorld dw1 = new DodgeWorld(d1, t1, t2, 0);
-    DodgeWorld dw1Left = new DodgeWorld(d1Left, t1, t2, 0);
-    DodgeWorld dw1Right = new DodgeWorld(d1Right, t1, t2, 0);
-    DodgeWorld dw1Up = new DodgeWorld(d1Up, t1, t2, 0);
-    DodgeWorld dw1Down = new DodgeWorld(d1Down, t1, t2, 0);
-    
-    DodgeWorld dw2 = new DodgeWorld(d2, t1, t2, 0);
+    DodgeWorld dw1 = new DodgeWorld(d1, t1, t2, e1, 0);
+    DodgeWorld dw1Left = new DodgeWorld(d1Left, t1, t2, e1, 0);
+    DodgeWorld dw1Right = new DodgeWorld(d1Right, t1, t2, e1, 0);
+    DodgeWorld dw1Up = new DodgeWorld(d1Up, t1, t2, e1, 0);
+    DodgeWorld dw1Down = new DodgeWorld(d1Down, t1, t2, e1, 0);
+
+    DodgeWorld dw2 = new DodgeWorld(d2, t1, t2, e1, 0);
 //    DodgeWorld dw3 = new DodgeWorld(d1, t3, t4, 0);
 //    DodgeWorld dw3Tick = new DodgeWorld(d1, t5, t6, 1);
-    DodgeWorld dw4 = new DodgeWorld(d1, t1, t2Down, 0);
-    DodgeWorld dw5 = new DodgeWorld(d1, t1Right, t2, 0);
-    DodgeWorld dw6 = new DodgeWorld(d1Left, t1, t2, 0);
-    DodgeWorld dw6Tick = new DodgeWorld(d1Left, t1Right, t2Down, 0);
-    
+    DodgeWorld dw4 = new DodgeWorld(d1, t1, t2Down, e1, 0);
+    DodgeWorld dw5 = new DodgeWorld(d1, t1Right, t2, e1, 0);
+    DodgeWorld dw6 = new DodgeWorld(d1Left, t1, t2, e1, 0);
+    DodgeWorld dw6Tick = new DodgeWorld(d1Left, t1Right, t2Down, e1, 0);
+
     // test method moveDodger in Dodger class
-    boolean testMoveDodger (Tester t){
-        return
-		t.checkExpect(this.d1.moveDodger("left"), 
-					  this.d1Left, "test moveDodger - Left " + "\n") &&
-		t.checkExpect(this.d1.moveDodger("right"), 
-					  this.d1Right, "test moveDodger - Right " + "\n") &&
-		t.checkExpect(this.d1.moveDodger("up"), 
-					  this.d1Up, "test moveDodger - Up " + "\n") &&
-		t.checkExpect(this.d1.moveDodger("down"), 
-					  this.d1Down, "test moveDodger - Down " + "\n");
+    boolean testMoveDodger(Tester t) {
+        return t.checkExpect(this.d1.moveDodger("left"),
+                this.d1Left, "test moveDodger - Left " + "\n")
+                && t.checkExpect(this.d1.moveDodger("right"),
+                        this.d1Right, "test moveDodger - Right " + "\n")
+                && t.checkExpect(this.d1.moveDodger("up"),
+                        this.d1Up, "test moveDodger - Up " + "\n")
+                && t.checkExpect(this.d1.moveDodger("down"),
+                        this.d1Down, "test moveDodger - Down " + "\n");
     }
-    
+
     // test method moveThing in Thing class
-    boolean testMoveThing (Tester t){
-        return
-		t.checkExpect(this.t1.moveThing(), 
-					  this.t1Right, "test moveThing - X Move " + "\n") &&
-		t.checkExpect(this.t2.moveThing(), 
-					  this.t2Down, "test moveThing - Y Move " + "\n");
+    boolean testMoveThing(Tester t) {
+        return t.checkExpect(this.t1.moveThing(),
+                this.t1Right, "test moveThing - X Move " + "\n")
+                && t.checkExpect(this.t2.moveThing(),
+                        this.t2Down, "test moveThing - Y Move " + "\n");
     }
-    
+
     // test method didCollide in Dodger class
-    boolean testDidCollide (Tester t){
-        return
-		t.checkExpect(this.d1.didCollide(t1), 
-					  true, "test didCollide " + "\n") &&
-                t.checkExpect(this.d1.didCollide(t2), 
-					  true, "test didCollide " + "\n") &&
-		t.checkExpect(this.d1Right.didCollide(t1Right), 
-					  true, "test didCollide " + "\n") &&
-                t.checkExpect(this.d1Down.didCollide(t2Down), 
-					  true, "test didCollide " + "\n");
+    boolean testDidCollide(Tester t) {
+        return t.checkExpect(this.d1.didCollide(t1),
+                true, "test didCollide " + "\n")
+                && t.checkExpect(this.d1.didCollide(t2),
+                        true, "test didCollide " + "\n")
+                && t.checkExpect(this.d1Right.didCollide(t1Right),
+                        true, "test didCollide " + "\n")
+                && t.checkExpect(this.d1Down.didCollide(t2Down),
+                        true, "test didCollide " + "\n");
     }
-    
-        // test method hitThing in Thing class
-//    boolean testDidCollide (Tester t){
-//        return
-//		t.checkExpect(this.t1.hitThing(t1), 
-//					  true, "test hitThing " + "\n") &&
-//                t.checkExpect(this.t2.hitThing(t2), 
-//					  true, "test hitThing " + "\n") &&
-//                t.checkExpect(this.t1.hitThing(t2), 
-//					  true, "test hitThing " + "\n");
-//    }
-    
+
+    // test method hitThing in Thing class
+    boolean testHitThing(Tester t) {
+        return t.checkExpect(this.t1.hitThing(t1),
+                true, "test hitThing " + "\n")
+                && t.checkExpect(this.t2.hitThing(t2),
+                        true, "test hitThing " + "\n")
+                && t.checkExpect(this.t1.hitThing(t2),
+                        true, "test hitThing " + "\n");
+    }
+
     // test method outOfBounds in Dodger class
-    boolean testOutOfBounds (Tester t){
-        return
-		t.checkExpect(this.d2.outOfBounds(wWIDTH,wHEIGHT), 
-					  true, "test outOfBounds - Left " + "\n") &&
-		t.checkExpect(this.d3.outOfBounds(wWIDTH,wHEIGHT), 
-					  true, "test outOfBounds - Right " + "\n") &&
-                t.checkExpect(this.d4.outOfBounds(wWIDTH,wHEIGHT), 
-					  true, "test outOfBounds - Top " + "\n") &&
-		t.checkExpect(this.d5.outOfBounds(wWIDTH,wHEIGHT), 
-					  true, "test outOfBounds - Bottom " + "\n");
+    boolean testOutOfBounds(Tester t) {
+        return t.checkExpect(this.d2.outOfBounds(wWIDTH, wHEIGHT),
+                true, "test outOfBounds - Left " + "\n")
+                && t.checkExpect(this.d3.outOfBounds(wWIDTH, wHEIGHT),
+                        true, "test outOfBounds - Right " + "\n")
+                && t.checkExpect(this.d4.outOfBounds(wWIDTH, wHEIGHT),
+                        true, "test outOfBounds - Top " + "\n")
+                && t.checkExpect(this.d5.outOfBounds(wWIDTH, wHEIGHT),
+                        true, "test outOfBounds - Bottom " + "\n");
     }
-    
+
     // test method atBounds in Dodger class
-    boolean testAtBounds (Tester t){
-        return
-		t.checkExpect(this.t3.atBounds(wWIDTH,wHEIGHT), 
-					  true, "test atBounds - Right " + "\n") &&
-		t.checkExpect(this.t4.atBounds(wWIDTH,wHEIGHT), 
-					  true, "test atBounds - Bottom " + "\n");
+    boolean testAtBounds(Tester t) {
+        return t.checkExpect(this.t3.atBounds(wWIDTH, wHEIGHT),
+                true, "test atBounds - Right " + "\n")
+                && t.checkExpect(this.t4.atBounds(wWIDTH, wHEIGHT),
+                        true, "test atBounds - Bottom " + "\n");
     }
-    
+
     // helper for testRandInt: boolean for if RandInt is in range given
     boolean checkRandInt() {
-        int rand = DodgeWorld.randInt(0,14);
-        return (rand <=14 && rand >=0);
+        int rand = DodgeWorld.randInt(0, 14);
+        return (rand <= 14 && rand >= 0);
     }
-    
+
     // test method randInt in DodgeWorld class
     boolean testRandInt(Tester t) {
         return t.checkExpect(this.checkRandInt(),
-                true, "test RandInt") && 
-                t.checkExpect(this.checkRandInt(),
-                        true, "test RandInt") && 
-                t.checkExpect(this.checkRandInt(),
-                        true, "test RandInt") &&
-                t.checkExpect(this.checkRandInt(),
-                        true, "test RandInt") && 
-                t.checkExpect(this.checkRandInt(),
+                true, "test RandInt")
+                && t.checkExpect(this.checkRandInt(),
+                        true, "test RandInt")
+                && t.checkExpect(this.checkRandInt(),
+                        true, "test RandInt")
+                && t.checkExpect(this.checkRandInt(),
+                        true, "test RandInt")
+                && t.checkExpect(this.checkRandInt(),
                         true, "test RandInt");
     }
-    
+
     // test method onKeyEvent in DodgeWorld class
-    boolean testOnKeyEvent (Tester t){
-        return
-		t.checkExpect(this.dw1.onKeyEvent("left"), 
-					  this.dw1Left, "test onKeyEvent - Left " + "\n") &&
-		t.checkExpect(this.dw1.onKeyEvent("right"), 
-					  this.dw1Right, "test onKeyEvent - Right " + "\n") &&
-		t.checkExpect(this.dw1.onKeyEvent("up"), 
-					  this.dw1Up, "test onKeyEvent - Up " + "\n") &&
-		t.checkExpect(this.dw1.onKeyEvent("down"), 
-					  this.dw1Down, "test onKeyEvent - Down " + "\n");
+    boolean testOnKeyEvent(Tester t) {
+        return t.checkExpect(this.dw1.onKeyEvent("left"),
+                this.dw1Left, "test onKeyEvent - Left " + "\n")
+                && t.checkExpect(this.dw1.onKeyEvent("right"),
+                        this.dw1Right, "test onKeyEvent - Right " + "\n")
+                && t.checkExpect(this.dw1.onKeyEvent("up"),
+                        this.dw1Up, "test onKeyEvent - Up " + "\n")
+                && t.checkExpect(this.dw1.onKeyEvent("down"),
+                        this.dw1Down, "test onKeyEvent - Down " + "\n");
     }
-    
+
     // test method onTick in DodgeWorld class
-    boolean testOnTick (Tester t){
-        return
-		t.checkExpect(this.dw2.onTick(), 
-					  this.dw2.endOfWorld("OutOfBounds"), "test onTick - Dodger OoB " + "\n") &&
-//		t.checkExpect(this.dw3.onTick(), 
-//					  this.dw3Tick, "test onTick - Things OoB " + "\n") &&
-		t.checkExpect(this.dw4.onTick(), 
-					  this.dw4.endOfWorld("DodgerThingCollision"), "test onTick - Dodger Thing1 Collide " + "\n") &&
-		t.checkExpect(this.dw5.onTick(), 
-					  this.dw5.endOfWorld("DodgerThingCollision"), "test onTick - Dodger Thing2 Collide " + "\n") &&
-                t.checkExpect(this.dw6.onTick(), 
-					  this.dw6Tick, "test onTick - Normal Move Things " + "\n");
+    boolean testOnTick(Tester t) {
+        return t.checkExpect(this.dw2.onTick(),
+                this.dw2.endOfWorld("OutOfBounds"), "test onTick - Dodger OoB " + "\n")
+                && // An onTick call when things are OoB returns new things at random locations: cannot test in this way.
+                //		t.checkExpect(this.dw3.onTick(), 
+                //					  this.dw3Tick, "test onTick - Things OoB " + "\n") &&
+                t.checkExpect(this.dw4.onTick(),
+                        this.dw4.endOfWorld("DodgerThingCollision"), "test onTick - Dodger Thing1 Collide " + "\n")
+                && t.checkExpect(this.dw5.onTick(),
+                        this.dw5.endOfWorld("DodgerThingCollision"), "test onTick - Dodger Thing2 Collide " + "\n")
+                && t.checkExpect(this.dw6.onTick(),
+                        this.dw6Tick, "test onTick - Normal Move Things " + "\n");
     }
-    
+
 }
 
 public class DodgeGame implements Constants {
@@ -382,13 +423,13 @@ public class DodgeGame implements Constants {
 //        System.out.println(testDodge.didCollide(testThing) + " should be " + true);
 //        System.out.println(testThing.hitThing(testThing2) + " should be " + true);
 //        System.out.println(testThing2.hitThing(testThing) + " should be " + true);
-        
         Testing test = new Testing();
         Tester.runReport(test, false, false);
 
         DodgeWorld w1 = new DodgeWorld(new Dodger(new Posn(300, 300), dRADIUS, dCOLOR),
                 new Thing(new Posn(20, 20 + DodgeWorld.randInt(0, 14) * 40), tRADIUS, 1, 0, tCOLOR),
-                new Thing(new Posn(20 + DodgeWorld.randInt(0, 14) * 40, 20), tRADIUS, 0, 1, tCOLOR), 0);
+                new Thing(new Posn(20 + DodgeWorld.randInt(0, 14) * 40, 20), tRADIUS, 0, 1, tCOLOR),
+                new Explosion(new Posn(-20, -20), eRADIUS, eCOLOR), 0);
         w1.bigBang(wWIDTH, wHEIGHT, 0.07);
 
     }
