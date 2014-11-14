@@ -491,7 +491,7 @@ public class DodgeGame implements Constants {
     public static void main(String[] args) {
 
         // Runs tests 
-        // Returns # of tests run is all pass, or first test to fail
+        // Returns # of tests run if all pass, or first test to fail
         Testing test = new Testing();
         Tester.runReport(test, false, false);
 
